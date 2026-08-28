@@ -2,24 +2,89 @@
 
 先週の実績が、翌週の計画を書き換える習慣プランナー。
 
-一般的な習慣アプリは記録しかしない。このアプリは、崩れた事実を次の計画に反映する
-ところまでを扱う（Plan → Do → Check → Act の環を閉じる）。
+一般的な習慣アプリは記録しかしない。だが実際の失敗は、記録の欠如ではなく
+「週の初めに計画を立てる → 数日で崩れる → 放置 → 翌週も同じ計画を立てて、また崩れる」
+というループにある。このアプリは、崩れた事実を次の計画に反映するところまでを扱う。
+
+## PDCA の環
+
+| 段階 | 画面 | 何をするか |
+|---|---|---|
+| **Plan** | 週の計画 | 固定予定から空き時間を算出し、習慣を自動配置する |
+| **Do** | 今日 | 実施・スキップを記録する |
+| **Check** | 振り返り | 達成率と過去4週の推移を集計する |
+| **Act** | 振り返り | 修正提案を出し、**承認すると翌週の配置に反映される** |
 
 ## 開発
 
 ```bash
 npm install
-npm run dev      # 開発サーバー
-npm run build    # 型チェック + 本番ビルド
-npm test         # 空き時間・自動配置ロジックのテスト（vitest）
+npm run dev        # 開発サーバー
+npm run build      # 型チェック + 本番ビルド
+npm test           # ロジックのテスト（vitest）
+npm run test:watch
 npm run lint
 ```
 
 ## 技術構成
 
-Vite + React + TypeScript / Tailwind CSS / date-fns / localStorage / vitest
+Vite + React + TypeScript / Tailwind CSS v4 / date-fns / localStorage / vitest / vite-plugin-pwa
 
-## 進捗（設計図の工程）
+データは `src/lib/storage.ts` に閉じてある。サーバー同期に差し替えるときは、このファイルだけを書き換えればよい。
+
+## 主なファイル
+
+| ファイル | 役割 |
+|---|---|
+| `src/lib/types.ts` | データモデル |
+| `src/lib/storage.ts` | 保存層（localStorage に触るのはここだけ） |
+| `src/lib/schedule.ts` | 空き時間の算出 |
+| `src/lib/plan.ts` | 自動配置アルゴリズム |
+| `src/lib/stats.ts` | 週の境界・達成率・進捗 |
+| `src/lib/suggest.ts` | 翌週への修正提案 |
+
+## 守っている設計原則
+
+1. 睡眠時間には絶対に配置しない
+2. 空き時間を埋め尽くさない（既定で70%が上限）
+3. 連続記録を主指標にしない。主指標は週単位の達成率
+4. 未実施を責める表現・色を使わない
+5. 提案は必ず承認制。目標を勝手に書き換えない
+6. 未配置は正直に出す。無理な配置を作らない
+
+これらはテストで検証している（`tests/`）。
+
+## デプロイ
+
+### GitHub Pages（設定済み）
+
+`.github/workflows/deploy.yml` が `main` への push で自動デプロイする。
+初回だけ、リポジトリの **Settings → Pages → Source** を **GitHub Actions** に切り替える必要がある。
+
+公開先は `https://<ユーザー名>.github.io/<リポジトリ名>/`。
+
+### Vercel / Cloudflare Pages
+
+ルート直下に置く場合は環境変数の設定は不要。
+
+- ビルドコマンド: `npm run build`
+- 出力ディレクトリ: `dist`
+
+サブパスに置く場合は、ビルド時に `BASE_PATH=/サブパス/` を渡す。
+
+## スマホで使う
+
+公開した URL をスマホのブラウザで開き、ホーム画面に追加する。
+
+- **iOS（Safari）**: 共有ボタン → 「ホーム画面に追加」
+- **Android（Chrome）**: メニュー → 「アプリをインストール」
+
+追加後はアドレスバーなしのアプリとして開き、**オフラインでも動く**（データは端末内の localStorage に入っている）。
+
+> データは端末とブラウザごとに保存される。別の端末とは同期しない。
+> ブラウザのデータを消すと記録も消える。
+
+## 工程
 
 - [x] Phase 0 — プロジェクト作成、Tailwind導入、5画面の骨組み
 - [x] Phase 1 — データ層 + 習慣のCRUD
@@ -27,6 +92,9 @@ Vite + React + TypeScript / Tailwind CSS / date-fns / localStorage / vitest
 - [x] Phase 3 — 自動配置（Plan）
 - [x] Phase 4 — 今日の画面 + 記録（Do）
 - [x] Phase 5 — 振り返り + 翌週提案（Act）**← ここで PDCA の環が閉じる**
-- [ ] Phase 6 — PWA化 + デプロイ
+- [x] Phase 6 — PWA化 + デプロイ
 
-詳細な仕様は設計図を参照。
+## これから
+
+急いで機能を足さないこと。まず自分で1ヶ月使い、本当に要ると分かったものだけ足す。
+候補は通知、カレンダー連携、CSV書き出し、複数端末での同期。

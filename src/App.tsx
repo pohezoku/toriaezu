@@ -22,15 +22,18 @@ export default function App() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="border-b border-line bg-card">
+      {/* ホーム画面から開いたとき、ステータスバーやホームバーに隠れないよう余白を取る */}
+      <header className="border-b border-line bg-card pt-[env(safe-area-inset-top)]">
         <div className="mx-auto max-w-2xl px-5 py-3">
           <p className="text-sm font-semibold tracking-wide">習慣プランナー</p>
         </div>
       </header>
 
-      <main className="flex-1 pb-20">{active.render()}</main>
+      <main className="flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+        {active.render()}
+      </main>
 
-      <nav className="fixed inset-x-0 bottom-0 border-t border-line bg-card">
+      <nav className="fixed inset-x-0 bottom-0 border-t border-line bg-card pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex max-w-2xl">
           {TABS.map((t) => {
             const selected = t.id === tab
