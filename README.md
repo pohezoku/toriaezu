@@ -25,7 +25,7 @@ Vite + React + TypeScript / Tailwind CSS / date-fns / localStorage / vitest
 - [x] Phase 1 — データ層 + 習慣のCRUD
 - [x] Phase 2 — 固定予定の登録 + 空き時間の算出
 - [x] Phase 3 — 自動配置（Plan）
-- [ ] Phase 4 — 今日の画面 + 記録（Do）
+- [x] Phase 4 — 今日の画面 + 記録（Do）
 - [ ] Phase 5 — 振り返り + 翌週提案（Act）
 - [ ] Phase 6 — PWA化 + デプロイ
 

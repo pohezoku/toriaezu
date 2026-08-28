@@ -4,6 +4,7 @@ import type {
   DayOfWeek,
   FixedEvent,
   Habit,
+  LogEntry,
   PlannedSlot,
   Settings,
 } from './types'
@@ -34,6 +35,12 @@ export interface AppStore {
     position: { dayOfWeek: DayOfWeek; startMinutes: number },
   ) => void
   removePlannedSlot: (id: string) => void
+  /**
+   * 実施・スキップを記録する。
+   * 同じ枠の記録が既にあれば置き換える（枠に紐づかない記録は同じ日・同じ習慣で置き換える）。
+   */
+  recordLog: (entry: Omit<LogEntry, 'id'>) => void
+  removeLog: (id: string) => void
 }
 
 export const AppStoreContext = createContext<AppStore | null>(null)

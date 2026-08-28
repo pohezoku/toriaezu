@@ -1,5 +1,5 @@
 import { addDays, addWeeks, format, getDay, parseISO, startOfWeek } from 'date-fns'
-import type { DayOfWeek, Habit, LogEntry } from './types'
+import type { DayOfWeek, Habit, LogEntry, PlannedSlot } from './types'
 
 /** 週の始まりは月曜。 */
 const WEEK_OPTIONS = { weekStartsOn: 1 } as const
@@ -57,4 +57,72 @@ export function achievementRate(
       ? done.length
       : done.reduce((sum, log) => sum + loggedMinutes(log, habit), 0)
   return achieved / habit.targetValue
+}
+
+/** その週の計画に対する進み具合。主指標は週単位の達成率（設計原則3）。 */
+export interface WeekProgress {
+  planned: number
+  done: number
+  skipped: number
+  /** 実施 / 計画。計画が無ければ 0。 */
+  rate: number
+}
+
+export function weekProgress(
+  slots: PlannedSlot[],
+  logs: LogEntry[],
+  weekStart: string,
+): WeekProgress {
+  const planned = slots.filter(
+    (slot) => slot.weekStart === weekStart && !slot.isReserve,
+  ).length
+  const weekLogs = logsInWeek(logs, weekStart)
+  const done = weekLogs.filter((log) => log.status === 'done').length
+  const skipped = weekLogs.filter((log) => log.status === 'skipped').length
+  return { planned, done, skipped, rate: planned === 0 ? 0 : done / planned }
+}
+
+/** その週、まだ実施できていない回数（計画 − 実施）。 */
+export function remainingSessions(
+  habit: Habit,
+  slots: PlannedSlot[],
+  logs: LogEntry[],
+  weekStart: string,
+): number {
+  const planned = slots.filter(
+    (slot) =>
+      slot.weekStart === weekStart && !slot.isReserve && slot.habitId === habit.id,
+  ).length
+  const done = logsInWeek(logs, weekStart).filter(
+    (log) => log.habitId === habit.id && log.status === 'done',
+  ).length
+  return Math.max(0, planned - done)
+}
+
+/**
+ * 予備枠に提案する習慣を選ぶ。
+ * 未消化が多いものを優先し、同数なら優先度の高いものを選ぶ。
+ * 予備枠の長さに収まらない習慣は提案しない。
+ */
+export function suggestForReserve(
+  habits: Habit[],
+  slots: PlannedSlot[],
+  logs: LogEntry[],
+  weekStart: string,
+  reserveMinutes: number,
+): Habit | null {
+  const candidates = habits
+    .filter((habit) => habit.active && habit.minBlockMinutes <= reserveMinutes)
+    .map((habit) => ({
+      habit,
+      remaining: remainingSessions(habit, slots, logs, weekStart),
+    }))
+    .filter((entry) => entry.remaining > 0)
+    .sort(
+      (a, b) =>
+        b.remaining - a.remaining ||
+        a.habit.priority - b.habit.priority ||
+        a.habit.createdAt.localeCompare(b.habit.createdAt),
+    )
+  return candidates[0]?.habit ?? null
 }

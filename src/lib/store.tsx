@@ -13,7 +13,13 @@ import {
   type FixedEventDraft,
   type HabitDraft,
 } from './store-context'
-import type { AppData, DayOfWeek, PlannedSlot, Settings } from './types'
+import type {
+  AppData,
+  DayOfWeek,
+  LogEntry,
+  PlannedSlot,
+  Settings,
+} from './types'
 
 export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(() => loadData())
@@ -174,6 +180,37 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     [update],
   )
 
+  const recordLog = useCallback(
+    (entry: Omit<LogEntry, 'id'>) => {
+      update((current) => {
+        const isSameRecord = (log: LogEntry) =>
+          entry.slotId !== undefined
+            ? log.slotId === entry.slotId
+            : log.slotId === undefined &&
+              log.habitId === entry.habitId &&
+              log.date === entry.date
+        return {
+          ...current,
+          logs: [
+            ...current.logs.filter((log) => !isSameRecord(log)),
+            { ...entry, id: createId() },
+          ],
+        }
+      })
+    },
+    [update],
+  )
+
+  const removeLog = useCallback(
+    (id: string) => {
+      update((current) => ({
+        ...current,
+        logs: current.logs.filter((log) => log.id !== id),
+      }))
+    },
+    [update],
+  )
+
   const value = useMemo<AppStore>(
     () => ({
       data,
@@ -189,6 +226,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setWeekPlan,
       movePlannedSlot,
       removePlannedSlot,
+      recordLog,
+      removeLog,
     }),
     [
       data,
@@ -204,6 +243,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setWeekPlan,
       movePlannedSlot,
       removePlannedSlot,
+      recordLog,
+      removeLog,
     ],
   )
 
