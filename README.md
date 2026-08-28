@@ -21,7 +21,7 @@ Vite + React + TypeScript / Tailwind CSS / date-fns / localStorage
 ## 進捗（設計図の工程）
 
 - [x] Phase 0 — プロジェクト作成、Tailwind導入、5画面の骨組み
-- [ ] Phase 1 — データ層 + 習慣のCRUD
+- [x] Phase 1 — データ層 + 習慣のCRUD
 - [ ] Phase 2 — 固定予定の登録 + 空き時間の算出
 - [ ] Phase 3 — 自動配置（Plan）
 - [ ] Phase 4 — 今日の画面 + 記録（Do）
