@@ -7,8 +7,13 @@ import {
   type ReactNode,
 } from 'react'
 import { createId, loadData, saveData } from './storage'
-import { AppStoreContext, type AppStore, type HabitDraft } from './store-context'
-import type { AppData } from './types'
+import {
+  AppStoreContext,
+  type AppStore,
+  type FixedEventDraft,
+  type HabitDraft,
+} from './store-context'
+import type { AppData, Settings } from './types'
 
 export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(() => loadData())
@@ -76,9 +81,81 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     [update],
   )
 
+  const addFixedEvents = useCallback(
+    (drafts: FixedEventDraft[]) => {
+      update((current) => ({
+        ...current,
+        fixedEvents: [
+          ...current.fixedEvents,
+          ...drafts.map((draft) => ({ ...draft, id: createId() })),
+        ],
+      }))
+    },
+    [update],
+  )
+
+  const replaceFixedEvents = useCallback(
+    (removeIds: string[], drafts: FixedEventDraft[]) => {
+      const removing = new Set(removeIds)
+      update((current) => ({
+        ...current,
+        fixedEvents: [
+          ...current.fixedEvents.filter((event) => !removing.has(event.id)),
+          ...drafts.map((draft) => ({ ...draft, id: createId() })),
+        ],
+      }))
+    },
+    [update],
+  )
+
+  const removeFixedEvents = useCallback(
+    (ids: string[]) => {
+      const removing = new Set(ids)
+      update((current) => ({
+        ...current,
+        fixedEvents: current.fixedEvents.filter(
+          (event) => !removing.has(event.id),
+        ),
+      }))
+    },
+    [update],
+  )
+
+  const updateSettings = useCallback(
+    (patch: Partial<Settings>) => {
+      update((current) => ({
+        ...current,
+        settings: { ...current.settings, ...patch },
+      }))
+    },
+    [update],
+  )
+
   const value = useMemo<AppStore>(
-    () => ({ data, update, addHabit, editHabit, setHabitActive, removeHabit }),
-    [data, update, addHabit, editHabit, setHabitActive, removeHabit],
+    () => ({
+      data,
+      update,
+      addHabit,
+      editHabit,
+      setHabitActive,
+      removeHabit,
+      addFixedEvents,
+      replaceFixedEvents,
+      removeFixedEvents,
+      updateSettings,
+    }),
+    [
+      data,
+      update,
+      addHabit,
+      editHabit,
+      setHabitActive,
+      removeHabit,
+      addFixedEvents,
+      replaceFixedEvents,
+      removeFixedEvents,
+      updateSettings,
+    ],
   )
 
   return (

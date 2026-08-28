@@ -13,6 +13,8 @@
   --color-line: oklch(0.92 0.006 260);
   --color-accent: oklch(0.62 0.1 200);
   --color-accent-soft: oklch(0.95 0.03 200);
+  /* 週間グリッドの固定予定。時刻線を透かさないよう不透明にする */
+  --color-block: oklch(0.9 0.008 260);
 }
 
 html,

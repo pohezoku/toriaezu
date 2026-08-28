@@ -29,6 +29,15 @@ export interface Habit {
   createdAt: string
 }
 
+/** 固定予定の種類。FixedEvent.category は自由文字列だが、入力はこの中から選ぶ。 */
+export const EVENT_CATEGORIES = [
+  '授業',
+  'バイト',
+  '部活',
+  'インターン',
+  'その他',
+] as const
+
 export interface FixedEvent {
   id: string
   dayOfWeek: DayOfWeek
