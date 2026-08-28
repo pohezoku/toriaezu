@@ -30,9 +30,17 @@ type Props = {
   settings: Settings
   fixedEvents: FixedEvent[]
   overlays?: OverlayBlock[]
+  selectedKey?: string | null
+  onSelect?: (key: string) => void
 }
 
-export function WeekGrid({ settings, fixedEvents, overlays = [] }: Props) {
+export function WeekGrid({
+  settings,
+  fixedEvents,
+  overlays = [],
+  selectedKey = null,
+  onSelect,
+}: Props) {
   const dayWindow = getDayWindow(settings)
   const windowLength = dayWindow.end - dayWindow.start
   const trackHeight = windowLength * PX_PER_MINUTE
@@ -143,22 +151,25 @@ export function WeekGrid({ settings, fixedEvents, overlays = [] }: Props) {
                       end: block.endMinutes,
                     })
                     if (range === null) return null
+                    const selected = block.key === selectedKey
                     return (
-                      <div
+                      <button
                         key={block.key}
+                        type="button"
+                        onClick={() => onSelect?.(block.key)}
                         title={`${block.label} ${formatTimeOfDay(block.startMinutes)}–${formatTimeOfDay(block.endMinutes)}`}
-                        className={`absolute inset-x-0.5 overflow-hidden rounded-sm px-1 py-0.5 text-[10px] leading-tight ${
+                        className={`absolute inset-x-0.5 overflow-hidden rounded-sm px-1 py-0.5 text-left text-[10px] leading-tight ${
                           block.tone === 'reserve'
-                            ? 'border border-dashed border-accent text-ink-soft'
+                            ? 'border border-dashed border-accent bg-card text-ink-soft'
                             : 'bg-accent text-white'
-                        }`}
+                        } ${selected ? 'ring-2 ring-ink ring-offset-1' : ''}`}
                         style={{
                           top: top(range.start),
                           height: (range.end - range.start) * PX_PER_MINUTE,
                         }}
                       >
                         {block.label}
-                      </div>
+                      </button>
                     )
                   })}
               </div>

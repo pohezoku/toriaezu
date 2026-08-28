@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 import {
   computeFreeIntervals,
   getDayWindow,
   mergeIntervals,
   subtractIntervals,
   totalMinutes,
-} from '../src/lib/schedule.ts'
-import type { DayOfWeek, FixedEvent, Settings } from '../src/lib/types.ts'
+} from '../src/lib/schedule'
+import type { DayOfWeek, FixedEvent, Settings } from '../src/lib/types'
 
 const settings: Settings = {
   wakeMinutes: 7 * 60,

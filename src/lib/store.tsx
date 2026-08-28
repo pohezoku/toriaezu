@@ -13,7 +13,7 @@ import {
   type FixedEventDraft,
   type HabitDraft,
 } from './store-context'
-import type { AppData, Settings } from './types'
+import type { AppData, DayOfWeek, PlannedSlot, Settings } from './types'
 
 export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(() => loadData())
@@ -131,6 +131,49 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     [update],
   )
 
+  const setWeekPlan = useCallback(
+    (weekStart: string, slots: PlannedSlot[]) => {
+      update((current) => ({
+        ...current,
+        plannedSlots: [
+          ...current.plannedSlots.filter((slot) => slot.weekStart !== weekStart),
+          ...slots,
+        ],
+      }))
+    },
+    [update],
+  )
+
+  const movePlannedSlot = useCallback(
+    (id: string, position: { dayOfWeek: DayOfWeek; startMinutes: number }) => {
+      update((current) => ({
+        ...current,
+        plannedSlots: current.plannedSlots.map((slot) =>
+          slot.id === id
+            ? {
+                ...slot,
+                dayOfWeek: position.dayOfWeek,
+                startMinutes: position.startMinutes,
+                endMinutes:
+                  position.startMinutes + (slot.endMinutes - slot.startMinutes),
+              }
+            : slot,
+        ),
+      }))
+    },
+    [update],
+  )
+
+  const removePlannedSlot = useCallback(
+    (id: string) => {
+      update((current) => ({
+        ...current,
+        plannedSlots: current.plannedSlots.filter((slot) => slot.id !== id),
+      }))
+    },
+    [update],
+  )
+
   const value = useMemo<AppStore>(
     () => ({
       data,
@@ -143,6 +186,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       replaceFixedEvents,
       removeFixedEvents,
       updateSettings,
+      setWeekPlan,
+      movePlannedSlot,
+      removePlannedSlot,
     }),
     [
       data,
@@ -155,6 +201,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       replaceFixedEvents,
       removeFixedEvents,
       updateSettings,
+      setWeekPlan,
+      movePlannedSlot,
+      removePlannedSlot,
     ],
   )
 

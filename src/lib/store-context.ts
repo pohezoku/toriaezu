@@ -1,5 +1,12 @@
 import { createContext, useContext } from 'react'
-import type { AppData, FixedEvent, Habit, Settings } from './types'
+import type {
+  AppData,
+  DayOfWeek,
+  FixedEvent,
+  Habit,
+  PlannedSlot,
+  Settings,
+} from './types'
 
 /** id と作成日時を除いた、フォームから編集できる部分。 */
 export type HabitDraft = Omit<Habit, 'id' | 'createdAt'>
@@ -20,6 +27,13 @@ export interface AppStore {
   replaceFixedEvents: (removeIds: string[], drafts: FixedEventDraft[]) => void
   removeFixedEvents: (ids: string[]) => void
   updateSettings: (patch: Partial<Settings>) => void
+  /** その週の計画をまるごと置き換える。 */
+  setWeekPlan: (weekStart: string, slots: PlannedSlot[]) => void
+  movePlannedSlot: (
+    id: string,
+    position: { dayOfWeek: DayOfWeek; startMinutes: number },
+  ) => void
+  removePlannedSlot: (id: string) => void
 }
 
 export const AppStoreContext = createContext<AppStore | null>(null)
