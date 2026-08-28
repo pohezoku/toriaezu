@@ -26,7 +26,7 @@ Vite + React + TypeScript / Tailwind CSS / date-fns / localStorage / vitest
 - [x] Phase 2 — 固定予定の登録 + 空き時間の算出
 - [x] Phase 3 — 自動配置（Plan）
 - [x] Phase 4 — 今日の画面 + 記録（Do）
-- [ ] Phase 5 — 振り返り + 翌週提案（Act）
+- [x] Phase 5 — 振り返り + 翌週提案（Act）**← ここで PDCA の環が閉じる**
 - [ ] Phase 6 — PWA化 + デプロイ
 
 詳細な仕様は設計図を参照。

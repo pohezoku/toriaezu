@@ -1,4 +1,4 @@
-import type { DayOfWeek, FixedEvent, Settings } from './types'
+import type { DayOfWeek, FixedEvent, Settings, TimeBand } from './types'
 
 /** 分単位の区間。end は含まない。 */
 export interface Interval {
@@ -11,6 +11,20 @@ export const MIN_FREE_MINUTES = 30
 
 export const DAYS: DayOfWeek[] = [0, 1, 2, 3, 4, 5, 6]
 export const DAY_LABELS = ['月', '火', '水', '木', '金', '土', '日'] as const
+
+/** 朝と昼の境目。 */
+export const MORNING_END = 11 * 60
+/** 昼と夜の境目。 */
+export const EVENING_START = 17 * 60
+
+/** その時刻がどの時間帯にあたるか。 */
+export function bandOf(startMinutes: number, settings: Settings): TimeBand {
+  // 起床が遅い日は「朝」が存在しないので、その場合は昼から始まる
+  const morningEnd = Math.max(MORNING_END, settings.wakeMinutes)
+  if (startMinutes < Math.min(morningEnd, EVENING_START)) return '朝'
+  if (startMinutes < EVENING_START) return '昼'
+  return '夜'
+}
 
 export function intervalLength(interval: Interval): number {
   return interval.end - interval.start

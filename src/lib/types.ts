@@ -12,6 +12,15 @@ export type Priority = 1 | 2 | 3
 /** 0=月 … 6=日。週の始まりを月曜として扱う。 */
 export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
+/** 1日の時間帯。朝=起床〜11:00 / 昼=11:00〜17:00 / 夜=17:00〜就寝。 */
+export type TimeBand = '朝' | '昼' | '夜'
+
+/** 配置を避ける枠。振り返りの提案を承認すると増える。 */
+export interface AvoidSlot {
+  dayOfWeek: DayOfWeek
+  band: TimeBand
+}
+
 export interface Habit {
   id: string
   name: string
@@ -27,6 +36,11 @@ export interface Habit {
   avoidConsecutiveDays: boolean
   active: boolean
   createdAt: string
+  /**
+   * 配置を避ける曜日と時間帯。
+   * 「金曜の夜はスキップが続く」といった提案をユーザーが承認すると増える。
+   */
+  avoidSlots?: AvoidSlot[]
 }
 
 /** 固定予定の種類。FixedEvent.category は自由文字列だが、入力はこの中から選ぶ。 */
@@ -82,6 +96,12 @@ export interface LogEntry {
   slotId?: string
 }
 
+/** 「今のままにする」と判断した提案。その週のあいだは出さない。 */
+export interface DismissedSuggestion {
+  key: string
+  weekStart: string
+}
+
 /** localStorage に保存される全データ。 */
 export interface AppData {
   schemaVersion: number
@@ -90,4 +110,5 @@ export interface AppData {
   settings: Settings
   plannedSlots: PlannedSlot[]
   logs: LogEntry[]
+  dismissedSuggestions: DismissedSuggestion[]
 }

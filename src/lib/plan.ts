@@ -1,8 +1,11 @@
 import { createId } from './storage'
 import { achievementRate, shiftWeek } from './stats'
 import {
+  bandOf,
   computeWeekFreeIntervals,
   DAYS,
+  EVENING_START,
+  MORNING_END,
   getDayWindow,
   intervalLength,
   MIN_FREE_MINUTES,
@@ -56,14 +59,14 @@ export function preferredWindow(
   const dayWindow = getDayWindow(settings)
   switch (timePref) {
     case '朝':
-      return { start: dayWindow.start, end: Math.min(11 * 60, dayWindow.end) }
+      return { start: dayWindow.start, end: Math.min(MORNING_END, dayWindow.end) }
     case '昼':
       return {
-        start: Math.max(11 * 60, dayWindow.start),
-        end: Math.min(17 * 60, dayWindow.end),
+        start: Math.max(MORNING_END, dayWindow.start),
+        end: Math.min(EVENING_START, dayWindow.end),
       }
     case '夜':
-      return { start: Math.max(17 * 60, dayWindow.start), end: dayWindow.end }
+      return { start: Math.max(EVENING_START, dayWindow.start), end: dayWindow.end }
     default:
       return dayWindow
   }
@@ -170,6 +173,7 @@ export function autoPlan(input: PlanInput): PlanResult {
   for (const habit of ordered) {
     const plan = sessionPlan(habit)
     const pref = preferredWindow(habit.timePref, settings)
+    const avoiding = habit.avoidSlots ?? []
     const placedDays: number[] = []
     let placed = 0
 
@@ -199,11 +203,19 @@ export function autoPlan(input: PlanInput): PlanResult {
           } else {
             continue
           }
+          // 承認済みの「避ける枠」は最後の手段にする（他に置けなければ置く）
+          const avoidHit = avoiding.some(
+            (slot) =>
+              slot.dayOfWeek === day && slot.band === bandOf(start, settings),
+          )
+            ? 1
+            : 0
           const candidate: Candidate = {
             day,
             interval,
             used: { start, end: start + plan.minutes },
             score: [
+              avoidHit,
               prefMiss,
               sameDay,
               capacity[day] > 0 ? used[day] / capacity[day] : 1,

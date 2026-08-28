@@ -13,6 +13,7 @@ import {
   type FixedEventDraft,
   type HabitDraft,
 } from './store-context'
+import { applySuggestion, type Suggestion } from './suggest'
 import type {
   AppData,
   DayOfWeek,
@@ -211,6 +212,35 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     [update],
   )
 
+  const approveSuggestion = useCallback(
+    (suggestion: Suggestion) => {
+      update((current) => ({
+        ...current,
+        habits: current.habits.map((habit) =>
+          habit.id === suggestion.habitId
+            ? applySuggestion(habit, suggestion)
+            : habit,
+        ),
+      }))
+    },
+    [update],
+  )
+
+  const dismissSuggestion = useCallback(
+    (key: string, weekStart: string) => {
+      update((current) => ({
+        ...current,
+        dismissedSuggestions: [
+          ...current.dismissedSuggestions.filter(
+            (entry) => !(entry.key === key && entry.weekStart === weekStart),
+          ),
+          { key, weekStart },
+        ],
+      }))
+    },
+    [update],
+  )
+
   const value = useMemo<AppStore>(
     () => ({
       data,
@@ -228,6 +258,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       removePlannedSlot,
       recordLog,
       removeLog,
+      approveSuggestion,
+      dismissSuggestion,
     }),
     [
       data,
@@ -245,6 +277,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       removePlannedSlot,
       recordLog,
       removeLog,
+      approveSuggestion,
+      dismissSuggestion,
     ],
   )
 

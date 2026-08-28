@@ -25,6 +25,7 @@ export function createEmptyData(): AppData {
     settings: { ...DEFAULT_SETTINGS },
     plannedSlots: [],
     logs: [],
+    dismissedSuggestions: [],
   }
 }
 
@@ -70,6 +71,9 @@ export function loadData(): AppData {
         ? parsed.plannedSlots
         : empty.plannedSlots,
       logs: Array.isArray(parsed.logs) ? parsed.logs : empty.logs,
+      dismissedSuggestions: Array.isArray(parsed.dismissedSuggestions)
+        ? parsed.dismissedSuggestions
+        : empty.dismissedSuggestions,
     } as AppData
   } catch (error) {
     console.error('保存データを読めなかったため退避します', error)

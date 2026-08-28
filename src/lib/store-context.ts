@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import type { Suggestion } from './suggest'
 import type {
   AppData,
   DayOfWeek,
@@ -41,6 +42,10 @@ export interface AppStore {
    */
   recordLog: (entry: Omit<LogEntry, 'id'>) => void
   removeLog: (id: string) => void
+  /** 提案を承認して習慣に反映する。承認するまで目標は変わらない（設計原則5）。 */
+  approveSuggestion: (suggestion: Suggestion) => void
+  /** 提案を見送る。その週のあいだは出さない。 */
+  dismissSuggestion: (key: string, weekStart: string) => void
 }
 
 export const AppStoreContext = createContext<AppStore | null>(null)
