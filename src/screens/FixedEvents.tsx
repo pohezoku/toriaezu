@@ -166,6 +166,7 @@ export function FixedEvents() {
 
 const FILL_RATIO_OPTIONS = [0.5, 0.6, 0.7, 0.8]
 const BUFFER_OPTIONS = [0, 5, 10, 15, 30]
+const DAILY_CAP_OPTIONS = [60, 90, 120, 180, 240, 300, 360]
 
 function SettingsCard() {
   const { data, updateSettings } = useAppStore()
@@ -252,9 +253,28 @@ function SettingsCard() {
           </select>
         </div>
       </div>
+      <div className="mt-4">
+        <label className="block text-xs font-medium text-ink-soft" htmlFor="daily-cap">
+          1日に習慣へ使う上限
+        </label>
+        <select
+          id="daily-cap"
+          className="mt-1 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent"
+          value={settings.maxDailyHabitMinutes}
+          onChange={(event) =>
+            updateSettings({ maxDailyHabitMinutes: Number(event.target.value) })
+          }
+        >
+          {DAILY_CAP_OPTIONS.map((minutes) => (
+            <option key={minutes} value={minutes}>
+              {formatMinutes(minutes)}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <p className="mt-1.5 text-xs text-ink-faint">
-        余白は移動・疲労・突発のために残します。{MIN_FREE_MINUTES}
-        分未満の空きは使いません。
+        {`余白は移動・疲労・突発のために残します。${MIN_FREE_MINUTES}分未満の空きは使いません。予定の前後の余白は、習慣どうしのあいだにも取ります。`}
       </p>
     </section>
   )

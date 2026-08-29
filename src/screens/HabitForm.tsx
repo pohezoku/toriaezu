@@ -10,16 +10,48 @@ import {
   type TimePref,
 } from '../lib/types'
 
-const DEFAULT_DRAFT: HabitDraft = {
+/**
+ * 入力中の状態。数値は文字列のまま持つ。
+ * 途中で空にできるようにし、入力した値をそのまま保つため。
+ */
+interface FormState {
+  name: string
+  category: Category
+  targetType: TargetType
+  targetValue: string
+  minBlockMinutes: string
+  timePref: TimePref
+  priority: Priority
+  avoidConsecutiveDays: boolean
+  active: boolean
+}
+
+const DEFAULT_FORM: FormState = {
   name: '',
   category: '学習',
   targetType: 'count',
-  targetValue: 3,
-  minBlockMinutes: 30,
+  targetValue: '3',
+  minBlockMinutes: '30',
   timePref: '指定なし',
   priority: 2,
   avoidConsecutiveDays: false,
   active: true,
+}
+
+function toForm(draft: HabitDraft): FormState {
+  return {
+    ...draft,
+    targetValue: String(draft.targetValue),
+    minBlockMinutes: String(draft.minBlockMinutes),
+  }
+}
+
+/** 整数として読めれば数値、読めなければ null。 */
+function parseInteger(value: string): number | null {
+  const trimmed = value.trim()
+  if (!/^\d+$/.test(trimmed)) return null
+  const parsed = Number(trimmed)
+  return Number.isSafeInteger(parsed) ? parsed : null
 }
 
 type Props = {
@@ -29,46 +61,61 @@ type Props = {
   onCancel: () => void
 }
 
+// w-full は付けない。幅は使う場所ごとに指定する（指定が競合して欄が潰れるのを防ぐ）
 const fieldClass =
-  'w-full rounded-lg border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent'
+  'rounded-lg border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent'
 const labelClass = 'block text-xs font-medium text-ink-soft'
 
 export function HabitForm({ initial, submitLabel, onSubmit, onCancel }: Props) {
-  const [draft, setDraft] = useState<HabitDraft>(initial ?? DEFAULT_DRAFT)
+  const [form, setForm] = useState<FormState>(
+    initial === undefined ? DEFAULT_FORM : toForm(initial),
+  )
   const [error, setError] = useState<string | null>(null)
 
-  const set = <K extends keyof HabitDraft>(key: K, value: HabitDraft[K]) => {
-    setDraft((current) => ({ ...current, [key]: value }))
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((current) => ({ ...current, [key]: value }))
   }
+
+  const targetValue = parseInteger(form.targetValue)
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault()
-    const name = draft.name.trim()
+    const name = form.name.trim()
     if (name === '') {
       setError('名前を入力してください')
       return
     }
-    if (!Number.isInteger(draft.targetValue) || draft.targetValue < 1) {
+    if (targetValue === null || targetValue < 1) {
       setError(
-        draft.targetType === 'count'
-          ? '週の目標は1以上の整数で入力してください'
-          : '週の目標は1分以上の整数で入力してください',
+        form.targetType === 'count'
+          ? '週の目標を1以上の回数で入力してください'
+          : '週の目標を1以上の分数で入力してください',
       )
       return
     }
-    if (!Number.isInteger(draft.minBlockMinutes) || draft.minBlockMinutes < 5) {
-      setError('最低ブロックは5分以上の整数で入力してください')
+    const minBlockMinutes = parseInteger(form.minBlockMinutes)
+    if (minBlockMinutes === null || minBlockMinutes < 5) {
+      setError('最低ブロックを5分以上で入力してください')
       return
     }
     setError(null)
-    onSubmit({ ...draft, name })
+    onSubmit({
+      name,
+      category: form.category,
+      targetType: form.targetType,
+      targetValue,
+      minBlockMinutes,
+      timePref: form.timePref,
+      priority: form.priority,
+      avoidConsecutiveDays: form.avoidConsecutiveDays,
+      active: form.active,
+    })
   }
 
   return (
     <form
       onSubmit={handleSubmit}
-      // 検証は下の handleSubmit で行い、メッセージも自前で出す。
-      // ブラウザ標準の step 検証に送信を止められないようにする。
+      // 検証は handleSubmit で行い、メッセージも自前で出す
       noValidate
       className="rounded-xl border border-line bg-card p-5 shadow-sm"
     >
@@ -79,8 +126,8 @@ export function HabitForm({ initial, submitLabel, onSubmit, onCancel }: Props) {
           </label>
           <input
             id="habit-name"
-            className={`${fieldClass} mt-1`}
-            value={draft.name}
+            className={`${fieldClass} mt-1 w-full`}
+            value={form.name}
             placeholder="例：ジム / ケース対策"
             onChange={(event) => set('name', event.target.value)}
             autoFocus
@@ -94,8 +141,8 @@ export function HabitForm({ initial, submitLabel, onSubmit, onCancel }: Props) {
             </label>
             <select
               id="habit-category"
-              className={`${fieldClass} mt-1`}
-              value={draft.category}
+              className={`${fieldClass} mt-1 w-full`}
+              value={form.category}
               onChange={(event) =>
                 set('category', event.target.value as Category)
               }
@@ -113,8 +160,8 @@ export function HabitForm({ initial, submitLabel, onSubmit, onCancel }: Props) {
             </label>
             <select
               id="habit-timepref"
-              className={`${fieldClass} mt-1`}
-              value={draft.timePref}
+              className={`${fieldClass} mt-1 w-full`}
+              value={form.timePref}
               onChange={(event) =>
                 set('timePref', event.target.value as TimePref)
               }
@@ -130,11 +177,11 @@ export function HabitForm({ initial, submitLabel, onSubmit, onCancel }: Props) {
 
         <div>
           <span className={labelClass}>週の目標</span>
-          <div className="mt-1 flex gap-2">
+          <div className="mt-1 flex items-center gap-2">
             <select
               aria-label="目標の種類"
-              className={`${fieldClass} w-32`}
-              value={draft.targetType}
+              className={`${fieldClass} w-24 shrink-0`}
+              value={form.targetType}
               onChange={(event) =>
                 set('targetType', event.target.value as TargetType)
               }
@@ -142,27 +189,21 @@ export function HabitForm({ initial, submitLabel, onSubmit, onCancel }: Props) {
               <option value="count">回数</option>
               <option value="minutes">時間</option>
             </select>
-            <div className="flex flex-1 items-center gap-2">
-              <input
-                aria-label="目標の値"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                step={draft.targetType === 'minutes' ? 15 : 1}
-                className={fieldClass}
-                value={draft.targetValue}
-                onChange={(event) =>
-                  set('targetValue', Number(event.target.value))
-                }
-              />
-              <span className="shrink-0 text-sm text-ink-soft">
-                {draft.targetType === 'count' ? '回 / 週' : '分 / 週'}
-              </span>
-            </div>
+            <input
+              aria-label="目標の値"
+              type="text"
+              inputMode="numeric"
+              className={`${fieldClass} w-0 min-w-16 flex-1 text-right tabular-nums`}
+              value={form.targetValue}
+              onChange={(event) => set('targetValue', event.target.value)}
+            />
+            <span className="shrink-0 text-sm text-ink-soft">
+              {form.targetType === 'count' ? '回 / 週' : '分 / 週'}
+            </span>
           </div>
-          {draft.targetType === 'minutes' && draft.targetValue >= 1 && (
+          {form.targetType === 'minutes' && targetValue !== null && targetValue >= 1 && (
             <p className="mt-1 text-xs text-ink-faint">
-              = 週{formatMinutes(Math.round(draft.targetValue))}
+              {`= 週${formatMinutes(targetValue)}`}
             </p>
           )}
         </div>
@@ -175,14 +216,12 @@ export function HabitForm({ initial, submitLabel, onSubmit, onCancel }: Props) {
             <div className="mt-1 flex items-center gap-2">
               <input
                 id="habit-minblock"
-                type="number"
+                type="text"
                 inputMode="numeric"
-                min={5}
-                step={5}
-                className={fieldClass}
-                value={draft.minBlockMinutes}
+                className={`${fieldClass} w-0 min-w-14 flex-1 text-right tabular-nums`}
+                value={form.minBlockMinutes}
                 onChange={(event) =>
-                  set('minBlockMinutes', Number(event.target.value))
+                  set('minBlockMinutes', event.target.value)
                 }
               />
               <span className="shrink-0 text-sm text-ink-soft">分</span>
@@ -194,8 +233,8 @@ export function HabitForm({ initial, submitLabel, onSubmit, onCancel }: Props) {
             </label>
             <select
               id="habit-priority"
-              className={`${fieldClass} mt-1`}
-              value={draft.priority}
+              className={`${fieldClass} mt-1 w-full`}
+              value={form.priority}
               onChange={(event) =>
                 set('priority', Number(event.target.value) as Priority)
               }
@@ -211,7 +250,7 @@ export function HabitForm({ initial, submitLabel, onSubmit, onCancel }: Props) {
           <input
             type="checkbox"
             className="size-4 accent-accent"
-            checked={draft.avoidConsecutiveDays}
+            checked={form.avoidConsecutiveDays}
             onChange={(event) =>
               set('avoidConsecutiveDays', event.target.checked)
             }

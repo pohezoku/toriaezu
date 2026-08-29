@@ -78,11 +78,11 @@ function intersect(a: Interval, b: Interval): Interval | null {
   return end > start ? { start, end } : null
 }
 
-/** interval から [start, start+minutes) を取り除いた残り。短すぎる断片は捨てる。 */
+/** interval から blocked の区間を取り除いた残り。短すぎる断片は捨てる。 */
 function removeFrom(
   intervals: Interval[],
   target: Interval,
-  used: Interval,
+  blocked: Interval,
 ): Interval[] {
   const result: Interval[] = []
   for (const interval of intervals) {
@@ -90,8 +90,8 @@ function removeFrom(
       result.push(interval)
       continue
     }
-    const before = { start: interval.start, end: used.start }
-    const after = { start: used.end, end: interval.end }
+    const before = { start: interval.start, end: blocked.start }
+    const after = { start: blocked.end, end: interval.end }
     if (intervalLength(before) >= MIN_FREE_MINUTES) result.push(before)
     if (intervalLength(after) >= MIN_FREE_MINUTES) result.push(after)
   }
@@ -149,9 +149,15 @@ export function autoPlan(input: PlanInput): PlanResult {
   const remaining = freeByDay.map((intervals) =>
     intervals.map((interval) => ({ ...interval })),
   )
-  // 手順3: 1日に置ける合計は、その日の空き時間 × maxFillRatio まで（設計原則2）
-  const capacity = freeByDay.map(
-    (intervals) => totalMinutes(intervals) * settings.maxFillRatio,
+  // 手順3: 1日に置ける合計の上限（設計原則2）。
+  // 空き時間の maxFillRatio と、1日あたりの絶対値の、厳しいほうを使う。
+  // 空きが多い人には割合だけでは歯止めにならないため。
+  // 設定が欠けていても上限が黙って消えないようにする
+  const dailyCap = Number.isFinite(settings.maxDailyHabitMinutes)
+    ? settings.maxDailyHabitMinutes
+    : Number.POSITIVE_INFINITY
+  const capacity = freeByDay.map((intervals) =>
+    Math.min(totalMinutes(intervals) * settings.maxFillRatio, dailyCap),
   )
   const used = DAYS.map(() => 0)
 
@@ -170,88 +176,132 @@ export function autoPlan(input: PlanInput): PlanResult {
   const slots: PlannedSlot[] = []
   const unplaced: UnplacedHabit[] = []
 
-  for (const habit of ordered) {
+  /** 配置の途中経過。習慣ごとに持つ。 */
+  interface Entry {
+    habit: Habit
+    plan: SessionPlan
+    pref: Interval
+    /** 同じ習慣を1日に置ける回数。原則1日1回。 */
+    maxPerDay: number
+    placedDays: number[]
+    placed: number
+    /** もう置ける場所が無いと分かったか。 */
+    stuck: boolean
+  }
+
+  const entries: Entry[] = ordered.map((habit) => {
     const plan = sessionPlan(habit)
-    const pref = preferredWindow(habit.timePref, settings)
+    return {
+      habit,
+      plan,
+      pref: preferredWindow(habit.timePref, settings),
+      maxPerDay: Math.max(1, Math.ceil(plan.count / DAYS.length)),
+      placedDays: [],
+      placed: 0,
+      stuck: plan.count === 0,
+    }
+  })
+
+  /** 1回ぶんの置き場所を探す。見つからなければ null。 */
+  const findSpot = (entry: Entry): Candidate | null => {
+    const { habit, plan, pref } = entry
     const avoiding = habit.avoidSlots ?? []
-    const placedDays: number[] = []
-    let placed = 0
+    let best: Candidate | null = null
 
-    for (let session = 0; session < plan.count; session += 1) {
-      let best: Candidate | null = null
+    for (const day of DAYS) {
+      if (used[day] + plan.minutes > capacity[day]) continue
+      if (
+        habit.avoidConsecutiveDays &&
+        entry.placedDays.some((other) => Math.abs(other - day) <= 1)
+      ) {
+        continue
+      }
+      const sameDay = entry.placedDays.filter((other) => other === day).length
+      if (sameDay >= entry.maxPerDay) continue
 
-      for (const day of DAYS) {
-        if (used[day] + plan.minutes > capacity[day]) continue
-        if (
-          habit.avoidConsecutiveDays &&
-          placedDays.some((other) => Math.abs(other - day) <= 1)
-        ) {
+      for (const interval of remaining[day]) {
+        const inPref = intersect(interval, pref)
+        let start: number
+        let prefMiss: number
+        if (inPref !== null && intervalLength(inPref) >= plan.minutes) {
+          start = inPref.start
+          prefMiss = 0
+        } else if (intervalLength(interval) >= plan.minutes) {
+          start = interval.start
+          prefMiss = 1
+        } else {
           continue
         }
-        const sameDay = placedDays.filter((other) => other === day).length
-
-        for (const interval of remaining[day]) {
-          const inPref = intersect(interval, pref)
-          let start: number
-          let prefMiss: number
-          if (inPref !== null && intervalLength(inPref) >= plan.minutes) {
-            start = inPref.start
-            prefMiss = 0
-          } else if (intervalLength(interval) >= plan.minutes) {
-            start = interval.start
-            prefMiss = 1
-          } else {
-            continue
-          }
-          // 承認済みの「避ける枠」は最後の手段にする（他に置けなければ置く）
-          const avoidHit = avoiding.some(
-            (slot) =>
-              slot.dayOfWeek === day && slot.band === bandOf(start, settings),
-          )
-            ? 1
-            : 0
-          const candidate: Candidate = {
+        // 承認済みの「避ける枠」は最後の手段にする（他に置けなければ置く）
+        const avoidHit = avoiding.some(
+          (slot) =>
+            slot.dayOfWeek === day && slot.band === bandOf(start, settings),
+        )
+          ? 1
+          : 0
+        const candidate: Candidate = {
+          day,
+          interval,
+          used: { start, end: start + plan.minutes },
+          score: [
+            avoidHit,
+            prefMiss,
+            sameDay,
+            capacity[day] > 0 ? used[day] / capacity[day] : 1,
             day,
-            interval,
-            used: { start, end: start + plan.minutes },
-            score: [
-              avoidHit,
-              prefMiss,
-              sameDay,
-              capacity[day] > 0 ? used[day] / capacity[day] : 1,
-              day,
-              start,
-            ],
-          }
-          if (best === null || betterThan(candidate.score, best.score)) {
-            best = candidate
-          }
+            start,
+          ],
+        }
+        if (best === null || betterThan(candidate.score, best.score)) {
+          best = candidate
         }
       }
+    }
+    return best
+  }
 
-      if (best === null) break
-
+  // 習慣ごとにまとめて置くのではなく、1回ぶんずつ順番に置いていく。
+  // 優先度の高い習慣が上限を食い尽くして、他が1回も置けないのを防ぐため。
+  const maxSessions = entries.reduce(
+    (most, entry) => Math.max(most, entry.plan.count),
+    0,
+  )
+  for (let round = 0; round < maxSessions; round += 1) {
+    for (const entry of entries) {
+      if (entry.stuck || entry.placed >= entry.plan.count) continue
+      const best = findSpot(entry)
+      if (best === null) {
+        // 空きは減る一方なので、一度置けなければこの先も置けない
+        entry.stuck = true
+        continue
+      }
       slots.push({
         id: createId(),
         weekStart,
-        habitId: habit.id,
+        habitId: entry.habit.id,
         dayOfWeek: best.day,
         startMinutes: best.used.start,
         endMinutes: best.used.end,
         isReserve: false,
       })
-      remaining[best.day] = removeFrom(remaining[best.day], best.interval, best.used)
-      used[best.day] += plan.minutes
-      placedDays.push(best.day)
-      placed += 1
+      // 枠の前後にも余白を取る。予定を壁のように連続させないため
+      remaining[best.day] = removeFrom(remaining[best.day], best.interval, {
+        start: best.used.start - settings.bufferMinutes,
+        end: best.used.end + settings.bufferMinutes,
+      })
+      used[best.day] += entry.plan.minutes
+      entry.placedDays.push(best.day)
+      entry.placed += 1
     }
+  }
 
-    if (placed < plan.count) {
+  for (const entry of entries) {
+    if (entry.placed < entry.plan.count) {
       unplaced.push({
-        habitId: habit.id,
-        requested: plan.count,
-        placed,
-        sessionMinutes: plan.minutes,
+        habitId: entry.habit.id,
+        requested: entry.plan.count,
+        placed: entry.placed,
+        sessionMinutes: entry.plan.minutes,
       })
     }
   }

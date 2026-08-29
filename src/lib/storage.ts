@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sleepMinutes: 23 * 60 + 30,
   bufferMinutes: 15,
   maxFillRatio: 0.7,
+  maxDailyHabitMinutes: 3 * 60,
 }
 
 export function createEmptyData(): AppData {

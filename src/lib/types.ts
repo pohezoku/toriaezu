@@ -69,6 +69,12 @@ export interface Settings {
   bufferMinutes: number
   /** 空き時間を埋める上限。設計原則2により既定 0.7。 */
   maxFillRatio: number
+  /**
+   * 1日に習慣へ使う上限（分）。
+   * 空き時間が多い人にとって maxFillRatio だけでは歯止めにならないため、
+   * 絶対値の上限も設ける。設計原則2。
+   */
+  maxDailyHabitMinutes: number
 }
 
 export interface PlannedSlot {

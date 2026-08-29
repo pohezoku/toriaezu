@@ -14,6 +14,7 @@ const settings: Settings = {
   sleepMinutes: 23 * 60,
   bufferMinutes: 15,
   maxFillRatio: 0.7,
+  maxDailyHabitMinutes: 3 * 60,
 }
 
 const at = (time: string): number => {

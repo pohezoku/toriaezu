@@ -12,6 +12,7 @@ import type {
   FixedEvent,
   Habit,
   LogEntry,
+  PlannedSlot,
   Settings,
 } from '../src/lib/types'
 
@@ -22,6 +23,7 @@ const settings: Settings = {
   sleepMinutes: 23 * 60,
   bufferMinutes: 15,
   maxFillRatio: 0.7,
+  maxDailyHabitMinutes: 3 * 60,
 }
 
 const at = (time: string): number => {
@@ -173,11 +175,8 @@ test('avoidConsecutiveDays: 同じ習慣が連日に置かれない', () => {
   }
 })
 
-test('設計原則2: 1日の配置合計が空き時間 × maxFillRatio を超えない', () => {
-  const freeByDay = computeWeekFreeIntervals([], settings)
-  const { slots } = run([
-    habit({ targetValue: 20, minBlockMinutes: 60, priority: 1 }),
-  ])
+/** 曜日ごとの、習慣に使っている合計時間。 */
+const minutesPerDay = (slots: PlannedSlot[]) => {
   const perDay = new Map<number, number>()
   for (const slot of slots.filter((s) => !s.isReserve)) {
     perDay.set(
@@ -185,11 +184,80 @@ test('設計原則2: 1日の配置合計が空き時間 × maxFillRatio を超�
       (perDay.get(slot.dayOfWeek) ?? 0) + slot.endMinutes - slot.startMinutes,
     )
   }
-  for (const [day, minutes] of perDay) {
-    const capacity =
-      freeByDay[day].reduce((sum, i) => sum + (i.end - i.start), 0) *
-      settings.maxFillRatio
-    assert.ok(minutes <= capacity, `${day}曜: ${minutes}分 > 上限${capacity}分`)
+  return perDay
+}
+
+test('設計原則2: 1日の配置合計が空き時間 × maxFillRatio を超えない', () => {
+  const freeByDay = computeWeekFreeIntervals([], settings)
+  // 空きが少ない日を作り、割合のほうが厳しくなる状況にする
+  const events = ([0, 1, 2, 3, 4, 5, 6] as DayOfWeek[]).map((day) =>
+    ev(day, '9:00', '22:00', 'ふさぐ'),
+  )
+  const { slots } = run([habit({ targetValue: 7, minBlockMinutes: 30, priority: 1 })], events)
+  for (const [day, minutes] of minutesPerDay(slots)) {
+    const free = freeByDay[day].reduce((sum, i) => sum + (i.end - i.start), 0)
+    assert.ok(
+      minutes <= free * settings.maxFillRatio,
+      `${day}曜: ${minutes}分 が割合の上限を超えた`,
+    )
+  }
+})
+
+test('設計原則2: 空きが多い日でも、1日に習慣へ使う上限を超えない', () => {
+  // 空きは1日16時間。割合だけなら11時間以上置けてしまう状況
+  const { slots } = run([
+    habit({ targetValue: 40, minBlockMinutes: 60, priority: 1 }),
+    habit({ targetValue: 40, minBlockMinutes: 30, priority: 2 }),
+  ])
+  for (const [day, minutes] of minutesPerDay(slots)) {
+    assert.ok(
+      minutes <= settings.maxDailyHabitMinutes,
+      `${day}曜: ${minutes}分 > 上限${settings.maxDailyHabitMinutes}分`,
+    )
+  }
+})
+
+test('枠と枠のあいだに余白が空く（壁のように連続させない）', () => {
+  const { slots } = run([
+    habit({ targetValue: 7, minBlockMinutes: 60, priority: 1 }),
+    habit({ targetValue: 7, minBlockMinutes: 30, priority: 2 }),
+    habit({ targetValue: 7, minBlockMinutes: 45, priority: 3 }),
+  ])
+  for (const day of [0, 1, 2, 3, 4, 5, 6]) {
+    const onDay = slots
+      .filter((slot) => slot.dayOfWeek === day)
+      .sort((a, b) => a.startMinutes - b.startMinutes)
+    for (let i = 1; i < onDay.length; i += 1) {
+      assert.ok(
+        onDay[i].startMinutes - onDay[i - 1].endMinutes >= settings.bufferMinutes,
+        `${day}曜で枠が連続した: ${onDay[i - 1].endMinutes} → ${onDay[i].startMinutes}`,
+      )
+    }
+  }
+})
+
+test('同じ習慣を1日に何度も置かない', () => {
+  const h = habit({ targetValue: 5, minBlockMinutes: 30 })
+  const { slots } = run([h])
+  const perDay = new Map<number, number>()
+  for (const slot of slots.filter((s) => s.habitId === h.id)) {
+    perDay.set(slot.dayOfWeek, (perDay.get(slot.dayOfWeek) ?? 0) + 1)
+  }
+  for (const [day, count] of perDay) {
+    assert.equal(count, 1, `${day}曜に${count}回置かれた`)
+  }
+})
+
+test('週7回を超える目標なら、1日2回までは許す', () => {
+  const h = habit({ targetValue: 10, minBlockMinutes: 30 })
+  const { slots } = run([h])
+  const perDay = new Map<number, number>()
+  for (const slot of slots.filter((s) => s.habitId === h.id)) {
+    perDay.set(slot.dayOfWeek, (perDay.get(slot.dayOfWeek) ?? 0) + 1)
+  }
+  assert.equal(slots.filter((s) => s.habitId === h.id).length, 10)
+  for (const [day, count] of perDay) {
+    assert.ok(count <= 2, `${day}曜に${count}回置かれた`)
   }
 })
 
@@ -205,8 +273,8 @@ test('設計原則6: 入りきらない分は詰め込まず、未配置とし�
   assert.equal(unplaced[0].sessionMinutes, 120)
 })
 
-test('目標が空き時間に収まるなら未配置は出ない', () => {
-  const { unplaced } = run([habit({ targetValue: 30, minBlockMinutes: 120 })])
+test('目標が1日の上限に収まるなら未配置は出ない', () => {
+  const { unplaced } = run([habit({ targetValue: 5, minBlockMinutes: 60 })])
   assert.deepEqual(unplaced, [])
 })
 
@@ -324,5 +392,31 @@ test('validateSlotPosition: 窓の外・固定予定・他の枠との重なり�
   assert.equal(
     validateSlotPosition(slot, { dayOfWeek: 1, startMinutes: at('15:30') }, context),
     null,
+  )
+})
+
+test('優先度の高い習慣が上限を食い尽くして、他が1回も置けなくなることはない', () => {
+  // 上限は1日3時間。優先度1の目標だけで週の上限を使い切る量にする
+  const heavy = habit({ name: '就活対策', targetValue: 15, minBlockMinutes: 60, priority: 1 })
+  const light = habit({ name: 'ダンス', targetValue: 4, minBlockMinutes: 90, priority: 3 })
+  const middle = habit({ name: '交渉学', targetValue: 8, minBlockMinutes: 30, priority: 2 })
+  const { slots, unplaced } = run([heavy, light, middle])
+
+  for (const h of [heavy, light, middle]) {
+    const placed = slots.filter((slot) => slot.habitId === h.id).length
+    assert.ok(placed > 0, `${h.name} が1回も置かれていない`)
+  }
+  // 入りきらないぶんは正直に未配置として出る
+  assert.ok(unplaced.length > 0)
+})
+
+test('優先度の高い習慣のほうが多く置かれる', () => {
+  const high = habit({ name: '高', targetValue: 10, minBlockMinutes: 60, priority: 1 })
+  const low = habit({ name: '低', targetValue: 10, minBlockMinutes: 60, priority: 3 })
+  const { slots } = run([low, high])
+  const count = (id: string) => slots.filter((slot) => slot.habitId === id).length
+  assert.ok(
+    count(high.id) >= count(low.id),
+    `高:${count(high.id)} 低:${count(low.id)}`,
   )
 })

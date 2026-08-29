@@ -44,7 +44,18 @@ export function WeekPlan() {
     (sum, intervals) => sum + totalMinutes(intervals),
     0,
   )
-  const usableMinutes = Math.floor(weekFreeMinutes * settings.maxFillRatio)
+  // 実際に使える上限は、割合と1日あたりの上限の、厳しいほうの合計
+  const usableMinutes = freeByDay.reduce(
+    (sum, intervals) =>
+      sum +
+      Math.floor(
+        Math.min(
+          totalMinutes(intervals) * settings.maxFillRatio,
+          settings.maxDailyHabitMinutes,
+        ),
+      ),
+    0,
+  )
   const plannedMinutes = slots
     .filter((slot) => !slot.isReserve)
     .reduce((sum, slot) => sum + slot.endMinutes - slot.startMinutes, 0)
@@ -112,7 +123,7 @@ export function WeekPlan() {
           {`今週の空きは ${formatMinutes(weekFreeMinutes)}`}
         </p>
         <p className="mt-1 text-xs text-ink-faint">
-          {`習慣に使うのは上限 ${Math.round(settings.maxFillRatio * 100)}% = ${formatMinutes(usableMinutes)} まで。残りは移動・疲労・突発のために空けておきます。`}
+          {`習慣に使うのは 1日 ${formatMinutes(settings.maxDailyHabitMinutes)} かつ空きの ${Math.round(settings.maxFillRatio * 100)}% まで（週 ${formatMinutes(usableMinutes)}）。残りは移動・疲労・突発のために空けておきます。`}
         </p>
         {plannedMinutes > 0 && (
           <p className="mt-2 text-sm">
